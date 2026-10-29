@@ -1,5 +1,7 @@
 # Product Activation Service
 
+[![Build and tests](https://github.com/IAbrahanArley/active-product/actions/workflows/ci.yml/badge.svg)](https://github.com/IAbrahanArley/active-product/actions/workflows/ci.yml)
+
 API de solicitações de ativação, em Java 21 e Spring Boot.
 
 ## Arquitetura
@@ -21,6 +23,13 @@ Foi adotada uma estrutura MVC em camadas, com contratos HTTP e documentação na
 ## Como executar
 
 Requisitos: Java 21 e Docker em execução. O Maven Wrapper está incluído.
+
+Clone o repositório e acesse a pasta:
+
+```powershell
+git clone https://github.com/IAbrahanArley/active-product.git
+cd active-product
+```
 
 ```powershell
 docker compose up -d postgres provider
@@ -158,7 +167,7 @@ Em Linux/macOS, use `./mvnw verify`. O Wrapper está versionado com permissão d
 
 O workflow `.github/workflows/ci.yml` executa em pushes e pull requests, com Java 21 em Ubuntu. Ele verifica o Docker, executa o Maven Wrapper com todos os testes, valida o Compose e constrói a imagem. O Testcontainers usa o Docker do runner. A configuração usa as actions oficiais [checkout](https://github.com/actions/checkout) e [setup-java](https://github.com/actions/setup-java), com permissão de leitura do repositório.
 
-O workflow está versionado, mas sua execução no GitHub depende da publicação do repositório. Ele não publica imagens nem realiza deploy.
+As execuções podem ser acompanhadas no [GitHub Actions](https://github.com/IAbrahanArley/active-product/actions/workflows/ci.yml). O workflow não publica imagens nem realiza deploy.
 
 ### Validação da entrega
 
