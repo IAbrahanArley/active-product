@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: product-postgres
+    environment:
+      POSTGRES_DB: product
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - product-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d product"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/product
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      CORS_ALLOWED_ORIGINS: http://localhost:4200,http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      JWT_EXPIRATION_MINUTES: 120
+    ports:
+      - "8080:8080"
+
+volumes:
+  product-postgres-data:
