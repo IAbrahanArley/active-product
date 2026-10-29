@@ -33,4 +33,20 @@ class ActivationRequestTest {
         assertThat(request.getStatus()).isEqualTo(ActivationStatus.FAILED);
         assertThatThrownBy(request::startProcessing).isInstanceOf(InvalidStatusTransitionException.class);
     }
+
+    @Test
+    void shouldScheduleRetryAndCountAttempts() {
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var nextAttempt = java.time.Instant.now().plusSeconds(10);
+        request.startProcessing();
+        request.scheduleRetry(nextAttempt);
+        assertThat(request.getStatus()).isEqualTo(ActivationStatus.PENDING);
+        assertThat(request.getAttempts()).isEqualTo(1);
+        assertThat(request.getNextAttemptAt()).isEqualTo(nextAttempt);
+        request.startProcessing();
+        assertThat(request.getAttempts()).isEqualTo(2);
+        request.complete();
+        assertThatThrownBy(() -> request.scheduleRetry(nextAttempt))
+                .isInstanceOf(InvalidStatusTransitionException.class);
+    }
 }

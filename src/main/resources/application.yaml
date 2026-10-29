@@ -29,6 +29,16 @@ management:
         enabled: true
 
 app:
+  processing:
+    enabled: ${PROCESSING_ENABLED:true}
+    poll-delay: ${PROCESSING_POLL_DELAY:1000}
+  provider:
+    base-url: ${PROVIDER_BASE_URL:http://localhost:8081}
+    connect-timeout: ${PROVIDER_CONNECT_TIMEOUT:2s}
+    read-timeout: ${PROVIDER_READ_TIMEOUT:3s}
+    max-attempts: ${PROVIDER_MAX_ATTEMPTS:3}
+    retry-delay: ${PROVIDER_RETRY_DELAY:2s}
+    idempotency-supported: ${PROVIDER_IDEMPOTENCY_SUPPORTED:false}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:5173,http://localhost:8080}
   jwt:

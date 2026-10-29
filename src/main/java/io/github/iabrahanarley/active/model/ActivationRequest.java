@@ -26,6 +26,10 @@ public class ActivationRequest {
     private Instant updatedAt;
     @Version
     private Long version;
+    @Column(nullable = false)
+    private int attempts;
+    @Column(nullable = false)
+    private Instant nextAttemptAt;
 
     protected ActivationRequest() {
     }
@@ -38,10 +42,12 @@ public class ActivationRequest {
         this.status = ActivationStatus.PENDING;
         this.createdAt = Instant.now();
         this.updatedAt = createdAt;
+        this.nextAttemptAt = createdAt;
     }
 
     public void startProcessing() {
         transition(ActivationStatus.PENDING, ActivationStatus.PROCESSING);
+        attempts++;
     }
 
     public void complete() {
@@ -51,6 +57,14 @@ public class ActivationRequest {
     public void fail() {
         transition(ActivationStatus.PROCESSING, ActivationStatus.FAILED);
     }
+
+    public void scheduleRetry(Instant nextAttemptAt) {
+        transition(ActivationStatus.PROCESSING, ActivationStatus.PENDING);
+        this.nextAttemptAt = nextAttemptAt;
+    }
+
+    public int getAttempts() { return attempts; }
+    public Instant getNextAttemptAt() { return nextAttemptAt; }
 
     private void transition(ActivationStatus expected, ActivationStatus target) {
         if (status != expected) {

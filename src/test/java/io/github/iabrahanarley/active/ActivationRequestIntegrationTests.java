@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Import(TestcontainersConfiguration.class)
-@SpringBootTest
+@SpringBootTest(properties = "app.processing.enabled=false")
 @AutoConfigureMockMvc
 class ActivationRequestIntegrationTests {
     @Autowired MockMvc mvc;

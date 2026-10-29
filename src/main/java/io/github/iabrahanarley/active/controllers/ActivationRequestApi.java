@@ -24,6 +24,7 @@ public interface ActivationRequestApi {
             Registra uma solicitação em PENDING. Campos obrigatórios com até 100 caracteres.
             externalId é único e sensível a maiúsculas; repetições retornam 409,
             inclusive quando o conteúdo é idêntico. Datas são retornadas em UTC.
+            A ativação ocorre de forma assíncrona; consulte o GET para acompanhar o resultado.
             """)
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Solicitação criada.",
