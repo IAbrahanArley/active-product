@@ -25,6 +25,7 @@ public interface ActivationRequestApi {
             externalId é único e sensível a maiúsculas; repetições retornam 409,
             inclusive quando o conteúdo é idêntico. Datas são retornadas em UTC.
             A ativação ocorre de forma assíncrona; consulte o GET para acompanhar o resultado.
+            Requer o escopo requests:write no token.
             """)
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Solicitação criada.",
@@ -33,6 +34,7 @@ public interface ActivationRequestApi {
         @ApiResponse(responseCode = "400", description = "Dados inválidos.",
             content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
         @ApiResponse(responseCode = "401", description = "Token ausente ou inválido.", content = @Content),
+        @ApiResponse(responseCode = "403", description = "Escopo requests:write ausente.", content = @Content),
         @ApiResponse(responseCode = "409", description = "externalId já cadastrado.",
             content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
         @ApiResponse(responseCode = "500", description = "Erro inesperado.",
@@ -41,7 +43,7 @@ public interface ActivationRequestApi {
     @PostMapping
     ResponseEntity<ActivationRequestResponse> create(@Valid @RequestBody CreateActivationRequest request);
 
-    @Operation(summary = "Consultar solicitação", description = "Retorna os dados e o status atual da solicitação.")
+    @Operation(summary = "Consultar solicitação", description = "Retorna os dados e o status atual da solicitação. Requer o escopo requests:read no token.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Solicitação encontrada.",
             content = @Content(schema = @Schema(implementation = ActivationRequestResponse.class))),
@@ -50,6 +52,7 @@ public interface ActivationRequestApi {
         @ApiResponse(responseCode = "401", description = "Token ausente ou inválido.", content = @Content),
         @ApiResponse(responseCode = "404", description = "Solicitação não encontrada.",
             content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+        @ApiResponse(responseCode = "403", description = "Escopo requests:read ausente.", content = @Content),
         @ApiResponse(responseCode = "500", description = "Erro inesperado.",
             content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })

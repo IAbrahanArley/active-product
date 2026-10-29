@@ -42,5 +42,6 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:5173,http://localhost:8080}
   jwt:
-    secret: ${JWT_SECRET:sdfuhj3sdcv021invQsdao8c3h2rgvasd3$WEDfv2}
-    expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    issuer: ${JWT_ISSUER:https://auth.local.test}
+    audience: ${JWT_AUDIENCE:product-activation-service}

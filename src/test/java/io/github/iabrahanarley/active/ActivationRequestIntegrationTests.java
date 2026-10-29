@@ -35,7 +35,7 @@ class ActivationRequestIntegrationTests {
 
     @Test
     void shouldCreateAndFindRequest() throws Exception {
-        mvc.perform(post("/api/v1/requests").with(jwt())
+        mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                 .contentType("application/json").content(payload("EXT-1")))
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
@@ -43,7 +43,7 @@ class ActivationRequestIntegrationTests {
                 .andExpect(jsonPath("$.externalId").value("EXT-1"));
 
         var id = repository.findAll().getFirst().getId();
-        mvc.perform(get("/api/v1/requests/{id}", id).with(jwt()))
+        mvc.perform(get("/api/v1/requests/{id}", id).with(authorizedJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.customerId").value("CUST-1"));
@@ -51,7 +51,7 @@ class ActivationRequestIntegrationTests {
 
     @Test
     void shouldRejectInvalidInput() throws Exception {
-        mvc.perform(post("/api/v1/requests").with(jwt())
+        mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                 .contentType("application/json")
                 .content("{\"externalId\":\" \",\"customerId\":\"\",\"productCode\":\"\"}"))
                 .andExpect(status().isBadRequest())
@@ -62,16 +62,16 @@ class ActivationRequestIntegrationTests {
 
     @Test
     void shouldRejectMalformedBodyAndInvalidId() throws Exception {
-        mvc.perform(post("/api/v1/requests").with(jwt())
+        mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                 .contentType("application/json").content("{"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get("/api/v1/requests/not-a-uuid").with(jwt()))
+        mvc.perform(get("/api/v1/requests/not-a-uuid").with(authorizedJwt()))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldReturnNotFound() throws Exception {
-        mvc.perform(get("/api/v1/requests/{id}", UUID.randomUUID()).with(jwt()))
+        mvc.perform(get("/api/v1/requests/{id}", UUID.randomUUID()).with(authorizedJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Solicitação não encontrada."));
     }
@@ -80,7 +80,7 @@ class ActivationRequestIntegrationTests {
     void shouldRejectDuplicateEvenWithDifferentContent() throws Exception {
         service.create(new CreateActivationRequest("EXT-1", "CUST-1", "INTERNET"));
         for (String body : new String[]{payload("EXT-1"), payload("EXT-1").replace("INTERNET", "PHONE")}) {
-            mvc.perform(post("/api/v1/requests").with(jwt())
+            mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                     .contentType("application/json").content(body))
                     .andExpect(status().isConflict());
         }
@@ -115,7 +115,7 @@ class ActivationRequestIntegrationTests {
                 if (!start.await(10, TimeUnit.SECONDS)) {
                     throw new IllegalStateException("Timeout aguardando início do teste");
                 }
-                return mvc.perform(post("/api/v1/requests").with(jwt())
+                return mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                         .contentType("application/json").content(payload("EXT-CONCURRENT")))
                         .andReturn().getResponse().getStatus();
             })).toList();
@@ -129,6 +129,10 @@ class ActivationRequestIntegrationTests {
             assertThat(statuses.stream().filter(code -> code == 201).count()).isEqualTo(1);
             assertThat(repository.count()).isEqualTo(1);
         }
+    }
+
+    private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor authorizedJwt() {
+        return jwt().jwt(token -> token.claim("scope", "requests:read requests:write"));
     }
 
     private String payload(String externalId) {
