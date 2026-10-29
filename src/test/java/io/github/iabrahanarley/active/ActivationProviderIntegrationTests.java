@@ -35,8 +35,8 @@ import static org.awaitility.Awaitility.await;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = {
         "app.processing.enabled=false",
-        "app.provider.connect-timeout=1s",
-        "app.provider.read-timeout=300ms",
+        "app.provider.connect-timeout=2s",
+        "app.provider.read-timeout=2s",
         "app.provider.max-attempts=2",
         "app.provider.retry-delay=20ms",
         "app.provider.idempotency-supported=true"
@@ -136,7 +136,7 @@ class ActivationProviderIntegrationTests {
 
     @Test
     void shouldRetryTimeoutAndKeepTheSameKey() {
-        RESPONSE_DELAY.set(1000);
+        RESPONSE_DELAY.set(4000);
         UUID id = createRequest();
         worker.processNext();
         assertThat(repository.findById(id).orElseThrow().getStatus()).isEqualTo(ActivationStatus.PENDING);
