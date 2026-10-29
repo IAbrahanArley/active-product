@@ -4,10 +4,13 @@ import io.github.iabrahanarley.active.clients.ActivationProviderClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 @ConditionalOnProperty(name = "app.processing.enabled", havingValue = "true", matchIfMissing = true)
 public class ActivationWorker {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ActivationWorker.class);
     private final ActivationProcessingService processingService;
     private final ActivationProviderClient providerClient;
 
@@ -19,8 +22,11 @@ public class ActivationWorker {
     @Scheduled(fixedDelayString = "${app.processing.poll-delay:1000}")
     public void processNext() {
         processingService.claimNext().ifPresent(task -> {
+            LOGGER.info("activation requestId={} attempt={} stage=STARTED", task.id(), task.attempt());
             var outcome = providerClient.activate(task.id().toString(), task.payload());
             processingService.finish(task.id(), outcome);
+            LOGGER.info("activation requestId={} attempt={} stage=FINISHED outcome={}",
+                    task.id(), task.attempt(), outcome);
         });
     }
 }

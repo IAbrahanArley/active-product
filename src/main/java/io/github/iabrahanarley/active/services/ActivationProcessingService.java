@@ -25,7 +25,7 @@ public class ActivationProcessingService {
     public Optional<ProcessingTask> claimNext() {
         return repository.findNextPending().map(request -> {
             request.startProcessing();
-            return new ProcessingTask(request.getId(), new ProviderActivationRequest(
+            return new ProcessingTask(request.getId(), request.getAttempts(), new ProviderActivationRequest(
                     request.getExternalId(), request.getCustomerId(), request.getProductCode()));
         });
     }
@@ -47,6 +47,6 @@ public class ActivationProcessingService {
         }
     }
 
-    public record ProcessingTask(UUID id, ProviderActivationRequest payload) {
+    public record ProcessingTask(UUID id, int attempt, ProviderActivationRequest payload) {
     }
 }
