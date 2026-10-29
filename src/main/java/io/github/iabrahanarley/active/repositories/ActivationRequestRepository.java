@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface ActivationRequestRepository extends JpaRepository<ActivationRequest, UUID> {
     boolean existsByExternalId(String externalId);
+    Optional<ActivationRequest> findByIdAndConsumerId(UUID id, String consumerId);
 
     @Query(value = """
             SELECT * FROM activation_requests

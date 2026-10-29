@@ -17,6 +17,8 @@ public class ActivationRequest {
     private String customerId;
     @Column(nullable = false, length = 100)
     private String productCode;
+    @Column(length = 200)
+    private String consumerId;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ActivationStatus status;
@@ -34,11 +36,15 @@ public class ActivationRequest {
     protected ActivationRequest() {
     }
 
-    public ActivationRequest(String externalId, String customerId, String productCode) {
+    public ActivationRequest(String externalId, String customerId, String productCode, String consumerId) {
+        if (consumerId == null || consumerId.isBlank() || consumerId.length() > 200) {
+            throw new IllegalArgumentException("Consumidor inválido.");
+        }
         this.id = UUID.randomUUID();
         this.externalId = externalId;
         this.customerId = customerId;
         this.productCode = productCode;
+        this.consumerId = consumerId;
         this.status = ActivationStatus.PENDING;
         this.createdAt = Instant.now();
         this.updatedAt = createdAt;

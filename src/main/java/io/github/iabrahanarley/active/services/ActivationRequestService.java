@@ -19,18 +19,18 @@ public class ActivationRequestService {
     }
 
     @Transactional
-    public ActivationRequestResponse create(CreateActivationRequest input) {
+    public ActivationRequestResponse create(CreateActivationRequest input, String consumerId) {
         if (repository.existsByExternalId(input.externalId())) {
             throw new DuplicateRequestException();
         }
         ActivationRequest request = new ActivationRequest(
-                input.externalId(), input.customerId(), input.productCode());
+                input.externalId(), input.customerId(), input.productCode(), consumerId);
         return ActivationRequestResponse.from(repository.saveAndFlush(request));
     }
 
     @Transactional(readOnly = true)
-    public ActivationRequestResponse findById(UUID id) {
-        return repository.findById(id)
+    public ActivationRequestResponse findById(UUID id, String consumerId) {
+        return repository.findByIdAndConsumerId(id, consumerId)
                 .map(ActivationRequestResponse::from)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada."));
     }

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.UUID;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/v1/requests")
@@ -19,13 +20,13 @@ public class ActivationRequestController implements ActivationRequestApi {
     }
 
     @Override
-    public ResponseEntity<ActivationRequestResponse> create(CreateActivationRequest request) {
-        ActivationRequestResponse response = service.create(request);
+    public ResponseEntity<ActivationRequestResponse> create(CreateActivationRequest request, Principal consumer) {
+        ActivationRequestResponse response = service.create(request, consumer.getName());
         return ResponseEntity.created(URI.create("/api/v1/requests/" + response.id())).body(response);
     }
 
     @Override
-    public ResponseEntity<ActivationRequestResponse> findById(UUID id) {
-        return ResponseEntity.ok(service.findById(id));
+    public ResponseEntity<ActivationRequestResponse> findById(UUID id, Principal consumer) {
+        return ResponseEntity.ok(service.findById(id, consumer.getName()));
     }
 }

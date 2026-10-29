@@ -16,6 +16,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
+import java.security.Principal;
 
 @Tag(name = "Solicitações", description = "Criação e consulta de solicitações de ativação.")
 @SecurityRequirement(name = "bearerAuth")
@@ -26,6 +27,7 @@ public interface ActivationRequestApi {
             inclusive quando o conteúdo é idêntico. Datas são retornadas em UTC.
             A ativação ocorre de forma assíncrona; consulte o GET para acompanhar o resultado.
             Requer o escopo requests:write no token.
+            A solicitação pertence ao consumidor identificado pelo sub do JWT.
             """)
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Solicitação criada.",
@@ -41,9 +43,13 @@ public interface ActivationRequestApi {
             content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping
-    ResponseEntity<ActivationRequestResponse> create(@Valid @RequestBody CreateActivationRequest request);
+    ResponseEntity<ActivationRequestResponse> create(@Valid @RequestBody CreateActivationRequest request,
+            @Parameter(hidden = true) Principal consumer);
 
-    @Operation(summary = "Consultar solicitação", description = "Retorna os dados e o status atual da solicitação. Requer o escopo requests:read no token.")
+    @Operation(summary = "Consultar solicitação", description = """
+            Retorna os dados e o status atual da solicitação do consumidor autenticado.
+            Requer o escopo requests:read. Solicitações de outro consumidor retornam 404.
+            """)
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Solicitação encontrada.",
             content = @Content(schema = @Schema(implementation = ActivationRequestResponse.class))),
@@ -59,5 +65,5 @@ public interface ActivationRequestApi {
     @GetMapping("/{id}")
     ResponseEntity<ActivationRequestResponse> findById(
         @Parameter(description = "Identificador UUID da solicitação.", required = true)
-        @PathVariable("id") UUID id);
+        @PathVariable("id") UUID id, @Parameter(hidden = true) Principal consumer);
 }

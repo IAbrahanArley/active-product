@@ -78,7 +78,7 @@ class ActivationRequestIntegrationTests {
 
     @Test
     void shouldRejectDuplicateEvenWithDifferentContent() throws Exception {
-        service.create(new CreateActivationRequest("EXT-1", "CUST-1", "INTERNET"));
+        service.create(new CreateActivationRequest("EXT-1", "CUST-1", "INTERNET"), "user");
         for (String body : new String[]{payload("EXT-1"), payload("EXT-1").replace("INTERNET", "PHONE")}) {
             mvc.perform(post("/api/v1/requests").with(authorizedJwt())
                     .contentType("application/json").content(body))

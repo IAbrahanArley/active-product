@@ -29,9 +29,11 @@ public class JwtConfig {
         var audienceValidator = new JwtClaimValidator<List<String>>("aud",
                 audience -> audience != null && audience.contains(properties.jwt().audience()));
         var expirationRequired = new JwtClaimValidator<Instant>("exp", Objects::nonNull);
+        var subjectRequired = new JwtClaimValidator<String>("sub",
+                subject -> subject != null && !subject.isBlank() && subject.length() <= 200);
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(properties.jwt().issuer()),
-                audienceValidator, expirationRequired));
+                audienceValidator, expirationRequired, subjectRequired));
         return decoder;
     }
 }

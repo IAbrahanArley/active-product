@@ -156,7 +156,7 @@ class ActivationProviderIntegrationTests {
     }
 
     private UUID createRequest() {
-        return requestService.create(new CreateActivationRequest("EXT-PROVIDER", "CUST-1", "INTERNET")).id();
+        return requestService.create(new CreateActivationRequest("EXT-PROVIDER", "CUST-1", "INTERNET"), "provider-test").id();
     }
 
     private void awaitRetry(UUID id) {

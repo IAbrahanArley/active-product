@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.*;
 class ActivationRequestTest {
     @Test
     void shouldCreatePendingRequest() {
-        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET", "consumer-test");
         assertThat(request.getStatus()).isEqualTo(ActivationStatus.PENDING);
         assertThat(request.getId()).isNotNull();
         assertThat(request.getCreatedAt()).isEqualTo(request.getUpdatedAt());
@@ -16,7 +16,7 @@ class ActivationRequestTest {
 
     @Test
     void shouldCompleteProcessingRequest() {
-        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET", "consumer-test");
         request.startProcessing();
         request.complete();
         assertThat(request.getStatus()).isEqualTo(ActivationStatus.COMPLETED);
@@ -26,7 +26,7 @@ class ActivationRequestTest {
 
     @Test
     void shouldFailProcessingRequest() {
-        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET", "consumer-test");
         assertThatThrownBy(request::complete).isInstanceOf(InvalidStatusTransitionException.class);
         request.startProcessing();
         request.fail();
@@ -36,7 +36,7 @@ class ActivationRequestTest {
 
     @Test
     void shouldScheduleRetryAndCountAttempts() {
-        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET", "consumer-test");
         var nextAttempt = java.time.Instant.now().plusSeconds(10);
         request.startProcessing();
         request.scheduleRetry(nextAttempt);

@@ -18,7 +18,7 @@ class ActivationProcessingServiceTest {
         var repository = mock(ActivationRequestRepository.class);
         var properties = new ProviderProperties(URI.create("http://localhost:8081"),
                 Duration.ofSeconds(1), Duration.ofSeconds(1), 3, Duration.ofSeconds(2), false);
-        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET");
+        var request = new ActivationRequest("EXT-1", "CUST-1", "INTERNET", "consumer-test");
         request.startProcessing();
         when(repository.findById(request.getId())).thenReturn(Optional.of(request));
 

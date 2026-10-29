@@ -4,6 +4,9 @@ param(
     [string]$Secret = $env:JWT_SECRET,
     [string]$Issuer = $env:JWT_ISSUER,
     [string]$Audience = $env:JWT_AUDIENCE,
+    [ValidateNotNullOrEmpty()]
+    [ValidateLength(1, 200)]
+    [string]$Subject = 'development-client',
     [ValidateRange(1, 60)]
     [int]$ExpirationMinutes = 5
 )
@@ -25,7 +28,7 @@ function ConvertTo-Base64Url([byte[]]$Data) {
 $tokenHeader = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes('{"alg":"HS256","typ":"JWT"}'))
 $issuedAt = [DateTimeOffset]::UtcNow
 $tokenClaims = @{
-    sub = 'development-client'
+    sub = $Subject
     iss = $Issuer
     aud = $Audience
     iat = $issuedAt.ToUnixTimeSeconds()

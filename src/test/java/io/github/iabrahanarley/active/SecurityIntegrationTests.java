@@ -36,6 +36,7 @@ class SecurityIntegrationTests {
     @Autowired AppProperties properties;
     @Autowired ActivationRequestRepository repository;
     @Autowired ActivationRequestService service;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @BeforeEach
     void cleanDatabase() {
@@ -53,7 +54,7 @@ class SecurityIntegrationTests {
 
     @Test
     void shouldAllowReadScopeToConsult() throws Exception {
-        UUID id = service.create(new CreateActivationRequest("EXT-SECURITY", "CUST-1", "INTERNET")).id();
+        UUID id = service.create(new CreateActivationRequest("EXT-SECURITY", "CUST-1", "INTERNET"), "consumer-test").id();
         mvc.perform(get("/api/v1/requests/{id}", id)
                 .header("Authorization", bearer("requests:read")))
                 .andExpect(status().isOk());
@@ -96,7 +97,7 @@ class SecurityIntegrationTests {
 
     @ParameterizedTest
     @ValueSource(strings = {"expired", "future", "issuer", "audience", "no-issuer", "no-audience",
-            "no-expiration", "signature", "malformed", "unsigned"})
+            "no-expiration", "signature", "malformed", "unsigned", "no-subject", "blank-subject", "long-subject"})
     void shouldRejectInvalidTokens(String scenario) throws Exception {
         var claims = validClaims("requests:write");
         String secret = properties.jwt().secret();
@@ -109,6 +110,9 @@ class SecurityIntegrationTests {
             case "no-audience" -> claims.audience((String) null);
             case "no-expiration" -> claims.expirationTime(null);
             case "signature" -> secret = "invalid-signing-key-at-least-32-bytes-long";
+            case "no-subject" -> claims.subject(null);
+            case "blank-subject" -> claims.subject(" ");
+            case "long-subject" -> claims.subject("a".repeat(201));
             default -> { }
         }
         String authorization = switch (scenario) {
@@ -135,6 +139,44 @@ class SecurityIntegrationTests {
 
     private String bearer(String scope) throws Exception {
         return sign(validClaims(scope), properties.jwt().secret());
+    }
+
+    @Test
+    void shouldHideRequestsFromOtherConsumers() throws Exception {
+        UUID id = service.create(new CreateActivationRequest("EXT-ISOLATION", "CUST-1", "INTERNET"),
+                "consumer-a").id();
+        String owner = sign(validClaims("requests:read").subject("consumer-a"), properties.jwt().secret());
+        String other = sign(validClaims("requests:read").subject("consumer-b"), properties.jwt().secret());
+        mvc.perform(get("/api/v1/requests/{id}", id).header("Authorization", owner))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/requests/{id}", id).header("Authorization", other))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Solicitação não encontrada."));
+    }
+
+    @Test
+    void shouldIgnoreOwnerSuppliedInRequestBody() throws Exception {
+        String body = """
+                {"externalId":"EXT-SPOOF","customerId":"CUST-1","productCode":"INTERNET",
+                 "consumerId":"consumer-b"}
+                """;
+        mvc.perform(post("/api/v1/requests").header("Authorization", bearer("requests:write"))
+                .contentType("application/json").content(body))
+                .andExpect(status().isCreated());
+        UUID id = repository.findAll().getFirst().getId();
+        assertThat(repository.findByIdAndConsumerId(id, "consumer-test")).isPresent();
+        assertThat(repository.findByIdAndConsumerId(id, "consumer-b")).isEmpty();
+    }
+
+    @Test
+    void shouldNotAssignLegacyRequestsToTheFirstReader() throws Exception {
+        UUID id = service.create(new CreateActivationRequest("EXT-LEGACY", "CUST-1", "INTERNET"),
+                "consumer-test").id();
+        jdbc.update("UPDATE activation_requests SET consumer_id = NULL WHERE id = ?", id);
+        mvc.perform(get("/api/v1/requests/{id}", id).header("Authorization", bearer("requests:read")))
+                .andExpect(status().isNotFound());
+        assertThat(repository.findById(id)).isPresent();
+        assertThat(repository.findByIdAndConsumerId(id, "consumer-test")).isEmpty();
     }
 
     private JWTClaimsSet.Builder validClaims(String scope) {

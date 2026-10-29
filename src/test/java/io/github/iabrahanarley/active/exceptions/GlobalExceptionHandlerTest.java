@@ -15,12 +15,12 @@ class GlobalExceptionHandlerTest {
     void shouldHideInternalDetailsWhenAnUnexpectedErrorOccurs() throws Exception {
         var service = mock(ActivationRequestService.class);
         var id = UUID.randomUUID();
-        when(service.findById(id)).thenThrow(new IllegalStateException(
+        when(service.findById(id, "consumer-test")).thenThrow(new IllegalStateException(
                 "password=internal-secret jdbc:postgresql://private-host/database"));
         var mvc = MockMvcBuilders.standaloneSetup(new ActivationRequestController(service))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
 
-        var result = mvc.perform(get("/api/v1/requests/{id}", id))
+        var result = mvc.perform(get("/api/v1/requests/{id}", id).principal(() -> "consumer-test"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
                 .andExpect(jsonPath("$.status").value(500))
@@ -30,5 +30,6 @@ class GlobalExceptionHandlerTest {
 
         assertThat(result.getResponse().getContentAsString())
                 .doesNotContain("internal-secret", "private-host", "IllegalStateException", "stackTrace");
+        verify(service).findById(id, "consumer-test");
     }
 }
