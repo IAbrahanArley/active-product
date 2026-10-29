@@ -11,6 +11,7 @@ public class ProviderClientConfig {
     @Bean
     RestClient providerRestClient(ProviderProperties properties) {
         HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
