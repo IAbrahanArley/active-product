@@ -32,7 +32,7 @@ services:
       postgres:
         condition: service_healthy
       provider:
-        condition: service_started
+        condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/product
       DB_USERNAME: postgres
@@ -43,6 +43,9 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE:-product-activation-service}
       PROVIDER_BASE_URL: http://provider:8080
       PROVIDER_IDEMPOTENCY_SUPPORTED: "false"
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 60s
     ports:
       - "8080:8080"
 

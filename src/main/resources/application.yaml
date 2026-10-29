@@ -1,4 +1,11 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 20s
   application:
     name: product-activation-service
   datasource:
@@ -16,6 +23,7 @@ spring:
       hibernate:
         format_sql: true
 server:
+  shutdown: graceful
   port: ${SERVER_PORT:8080}
 
 management:
