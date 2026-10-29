@@ -54,6 +54,10 @@ Os escopos são independentes: escrita não concede leitura automaticamente. O t
 
 O decoder aceita somente HS256 e valida assinatura, emissor `iss`, audiência `aud`, presença e validade de `exp` e `nbf` quando informado. As validações temporais usam a tolerância padrão do Spring Security, de 60 segundos. Claims `iss`, `aud` e `exp` são obrigatórios.
 
+O claim `sub` também é obrigatório, não pode ser vazio e aceita até 200 caracteres. Ele identifica o consumidor, que deve ser estável por sistema no servidor de autorização. Cada solicitação pertence ao consumidor autenticado no momento da criação. A consulta filtra por ID e consumidor; um ID inexistente ou pertencente a outro consumidor retorna o mesmo 404. O corpo da requisição não define nem altera o proprietário.
+
+A migration V3 preserva os registros anteriores com proprietário desconhecido. Eles permanecem inacessíveis pela API até uma atribuição operacional conferida; o primeiro consumidor a consultar um ID nunca recebe sua propriedade. A unicidade de externalId continua global, conforme o desafio.
+
 | Variável | Valor local padrão |
 |---|---|
 | `JWT_SECRET` | Segredo de desenvolvimento do Compose, compartilhado com a execução local |
@@ -68,6 +72,8 @@ Para experimentar localmente, o auxiliar abaixo gera um token de desenvolvimento
 $token = .\scripts\New-DevelopmentToken.ps1
 # Para criar um consumidor com acesso somente de leitura:
 $readToken = .\scripts\New-DevelopmentToken.ps1 -Scope 'requests:read'
+# Para simular outro consumidor:
+$otherToken = .\scripts\New-DevelopmentToken.ps1 -Subject 'consumer-b'
 ```
 
 No Swagger, cole o valor de `$token` em Authorize, sem o prefixo Bearer. O auxiliar usa as mesmas variáveis de ambiente; se passar configuração diferente ao container, use os parâmetros `-Secret`, `-Issuer` e `-Audience` correspondentes. O script é uma ferramenta local e não implementa um fluxo OAuth nem deve ser usado para emitir tokens de produção.
@@ -144,6 +150,22 @@ O cliente usa HTTP/1.1 explicitamente, evitando negociação de upgrade HTTP/2 n
 
 Os testes de domínio e política de retry executam sem Spring. Os testes de integração usam MockMvc, a aplicação completa e PostgreSQL isolado via Testcontainers, com as migrations reais. Cobrem criação, validação, consulta, duplicidade, chamadas concorrentes, ausência de autenticação e geração OpenAPI a partir da interface. Para o provedor, um servidor HTTP local controlado pelo teste responde com sucesso, 400, 429, 500, 503 e atraso superior ao timeout. Os testes verificam status persistido, limite de tentativas, chave estável e ausência de transação durante a chamada HTTP. O worker agendado é desabilitado nos testes para que cada ciclo seja acionado de maneira determinística. Os testes funcionais da API simulam um JWT autorizado; `SecurityIntegrationTests` envia tokens realmente assinados pelo filtro Bearer e pelo decoder, cobrindo escopos, assinatura incorreta, emissor/audiência incorretos ou ausentes, expiração, ausência de expiração, nbf futuro, token malformado e token sem assinatura.
 
+Também há testes de isolamento entre consumidores, rejeição de sub inválido, proteção dos registros anteriores sem proprietário, resposta 500 sem detalhes internos, logs do provedor sem conteúdo sensível e interrupção de novas reservas no desligamento.
+
+Em Linux/macOS, use `./mvnw verify`. O Wrapper está versionado com permissão de execução. Os testes não dependem do banco ou do mock do Compose: criam seus próprios recursos isolados.
+
+### Integração contínua
+
+O workflow `.github/workflows/ci.yml` executa em pushes e pull requests, com Java 21 em Ubuntu. Ele verifica o Docker, executa o Maven Wrapper com todos os testes, valida o Compose e constrói a imagem. O Testcontainers usa o Docker do runner. A configuração usa as actions oficiais [checkout](https://github.com/actions/checkout) e [setup-java](https://github.com/actions/setup-java), com permissão de leitura do repositório.
+
+O workflow está versionado, mas sua execução no GitHub depende da publicação do repositório. Ele não publica imagens nem realiza deploy.
+
+### Validação da entrega
+
+A suíte de 51 testes foi validada em Windows e em Linux com Java 21. Para a validação Linux, foi criado um clone local apenas com arquivos versionados, e os fontes foram copiados para um diretório novo no container, sem reaproveitar classes compiladas. O cache de dependências Maven foi reutilizado.
+
+O Compose desse clone foi construído e executado com banco, volume e porta separados do ambiente principal; uma solicitação autenticada percorreu PENDING até COMPLETED. Também foram conferidos o UID 10001, o health check, a resposta 404 para outro consumidor e o desligamento durante uma ativação em andamento, que concluiu antes da parada. Os recursos do Compose de validação foram removidos ao final.
+
 ## Cenário de análise: lentidão em produção
 
 O cenário informa aumento do tempo médio da API de 300 ms para 2,5 s, de algumas consultas de 50 ms para 1,2 s e do provedor de 400 ms para 3 s, com CPU em 45% e memória em 60%. Esses percentuais, isoladamente, não comprovam que a aplicação está saudável nem indicam saturação de CPU ou memória. Começaria delimitando o horário da regressão e comparando volume de chamadas, endpoints afetados, taxa de erros e mudanças recentes de código, infraestrutura ou configuração.
@@ -169,7 +191,7 @@ Usaria latência e taxa de erro por endpoint, conexões ativas/ociosas/pendentes
 
 Os logs deveriam conter identificador de correlação, ID interno da solicitação, etapa, duração, número da tentativa e categoria do resultado, propagando o identificador até o provedor. Tokens, credenciais e corpos completos não seriam registrados. Um trace por fluxo ajudaria a atribuir o tempo a cada componente.
 
-Atualmente, o projeto expõe Actuator/Prometheus e possui logs básicos de exceção. Correlação persistida para o worker, métricas próprias do provedor e das solicitações e tracing distribuído ainda não estão implementados. A disponibilidade do endpoint Prometheus, por si só, não significa que todas essas medições já existam.
+Atualmente, o projeto expõe Actuator/Prometheus e registra ID interno, tentativa, etapas do worker, status HTTP, duração e categoria de falha de transporte/timeout do provedor. Mensagens de exceção e corpos não são registrados pelo cliente do provedor. Um identificador de correlação separado, propagado desde a API, métricas próprias do provedor e das solicitações e tracing distribuído ainda não estão implementados. A disponibilidade do endpoint Prometheus, por si só, não significa que todas essas medições já existam.
 
 ### Melhorias que consideraria
 
@@ -197,10 +219,10 @@ Um procedimento de build e execução, em PowerShell, seria:
 docker build -t product-activation-service:1.0.0 .
 
 # O arquivo de ambiente deve existir fora do repositório e ter acesso restrito.
-docker run --detach --name product-activation-service --env-file C:\deploy\product-activation.env --publish 127.0.0.1:8080:8080 --memory 512m --cpus 1 --env JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=70.0 --stop-timeout 30 product-activation-service:1.0.0
+docker run --detach --name product-activation-service --env-file C:\deploy\product-activation.env --publish 127.0.0.1:8080:8080 --memory 512m --cpus 1 --stop-timeout 60 product-activation-service:1.0.0
 ```
 
-Os limites de CPU, memória e heap do exemplo são um ponto de partida e devem ser dimensionados por teste de carga. A imagem atual não executa os testes no build Docker, por isso o verify aparece como etapa anterior. Em CI, publicaria uma imagem identificada pelo commit validado, em vez de reutilizar uma tag mutável.
+Os limites de CPU, memória e heap do exemplo são um ponto de partida e devem ser dimensionados por teste de carga. A imagem executa com UID 10001 e configura o heap máximo em 70% da memória do container por JAVA_TOOL_OPTIONS. O Compose aplica 512 MiB e uma CPU para a API. O build reutiliza um cache Maven do BuildKit. A imagem não executa os testes no build Docker, por isso o verify aparece como etapa anterior. A CI constrói a imagem após os testes; para publicação futura, usaria uma identificação pelo commit validado.
 
 O arquivo de ambiente externo deve conter os valores reais de:
 
@@ -219,21 +241,16 @@ O exemplo descreve a execução da imagem atual. A configuração de uma credenc
 
 O Flyway aplica as migrations na inicialização e o Hibernate valida o schema. Planejaria mudanças compatíveis com versões coexistentes da aplicação, com backup e execução controlada das migrations. Se as permissões de alteração de schema forem separadas das permissões de execução, a plataforma deverá executar o Flyway como etapa de deploy.
 
-Colocaria a aplicação atrás de um proxy ou gateway com HTTPS e limitaria o acesso às métricas à rede operacional. A publicação em 127.0.0.1 no exemplo pressupõe um proxy no mesmo host; em uma plataforma de containers, o roteamento deve ser configurado pela própria plataforma. Os endpoints `/actuator/health/liveness` e `/actuator/health/readiness` estão habilitados para integração com as sondas do ambiente. O Dockerfile atual ainda não inclui HEALTHCHECK nem usuário sem privilégios.
+Colocaria a aplicação atrás de um proxy ou gateway com HTTPS e limitaria o acesso às métricas à rede operacional. A publicação em 127.0.0.1 no exemplo pressupõe um proxy no mesmo host; em uma plataforma de containers, o roteamento deve ser configurado pela própria plataforma. Os endpoints `/actuator/health/liveness` e `/actuator/health/readiness` estão habilitados para integração com as sondas do ambiente. O HEALTHCHECK da imagem consulta readiness; a dependência do banco deve ser considerada também pela política de sondas da plataforma.
 
-No desligamento, configuraria explicitamente a drenagem de requisições e a política para o worker antes de substituir instâncias. O stop-timeout do comando limita a espera do Docker, mas não implementa sozinho essa coordenação. Solicitações interrompidas em PROCESSING exigem reconciliação com o provedor antes de qualquer reenvio.
+No desligamento, a aplicação usa shutdown gracioso para a API, com limite de 20 segundos por fase. O worker para de iniciar novas reservas ao receber o evento de encerramento, e o scheduler aguarda até 20 segundos pelo trabalho em andamento. O Compose concede 60 segundos antes de forçar o encerramento. Os timeouts do provedor devem caber nessa janela; ampliar esses valores exige revisar os limites de desligamento. Quedas abruptas ou trabalho que exceda o prazo ainda podem deixar solicitações em PROCESSING, exigindo reconciliação com o provedor antes de qualquer reenvio.
 
 ## Pontos pendentes
 
-- Isolamento entre consumidores (BOLA): atualmente, um token de leitura pode consultar solicitações de outros consumidores se souber o ID. A evolução deve persistir o identificador do consumidor e restringir as consultas por esse identificador.
 - Migração da chave HS256 de desenvolvimento para chaves públicas JWKS do servidor OAuth 2.0.
 - Reconciliação de solicitações presas em PROCESSING, Retry-After e jitter.
 - Autenticação do cliente do provedor e carregamento/renovação da credencial conforme a estratégia descrita acima.
-- Logs de diagnóstico das falhas do provedor, com categoria e duração sem exposição de credenciais.
 - Correlação propagada da API ao worker/provedor e métricas específicas de processamento.
-- Teste específico de erro inesperado para verificar a resposta 500 sem detalhes internos.
-- CI, permissão de execução do mvnw em Linux e validação a partir de um clone limpo.
-- Usuário sem privilégios, health check da API e coordenação explícita de desligamento.
 - Listagem paginada com filtros por status e customerId; definir índices a partir das consultas previstas.
 - Limites de corpo e taxa de chamadas, testes de arquitetura e registros de decisão (ADRs).
 
