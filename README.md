@@ -46,6 +46,37 @@ Métricas: http://localhost:8080/actuator/prometheus
 
 A documentação e as métricas estão liberadas na configuração de desenvolvimento. Os endpoints da API exigem JWT Bearer HS256 assinado com `JWT_SECRET`. Não existe formulário de login nem emissão de tokens neste serviço. O botão Authorize do Swagger recebe um token emitido externamente.
 
+### Segurança e acesso local
+
+| Operação | Escopo exigido |
+|---|---|
+| POST /api/v1/requests | `requests:write` |
+| GET /api/v1/requests/{id} | `requests:read` |
+
+Os escopos são independentes: escrita não concede leitura automaticamente. O token pode conter ambos no claim `scope`, separados por espaço, ou no array `scp`. Um token válido sem o escopo necessário retorna `403`. Token ausente, malformado, sem assinatura válida ou com claims inválidos retorna `401`, com header `WWW-Authenticate`.
+
+O decoder aceita somente HS256 e valida assinatura, emissor `iss`, audiência `aud`, presença e validade de `exp` e `nbf` quando informado. As validações temporais usam a tolerância padrão do Spring Security, de 60 segundos. Claims `iss`, `aud` e `exp` são obrigatórios.
+
+| Variável | Valor local padrão |
+|---|---|
+| `JWT_SECRET` | Segredo de desenvolvimento do Compose, compartilhado com a execução local |
+| `JWT_ISSUER` | `https://auth.local.test` |
+| `JWT_AUDIENCE` | `product-activation-service` |
+
+O endereço de emissor local identifica o token; não é um servidor de autenticação executado pelo projeto. A expiração vem no token emitido, por isso a antiga configuração `JWT_EXPIRATION_MINUTES` foi removida do serviço.
+
+Para experimentar localmente, o auxiliar abaixo gera um token de desenvolvimento válido por cinco minutos:
+
+```powershell
+$token = .\scripts\New-DevelopmentToken.ps1
+# Para criar um consumidor com acesso somente de leitura:
+$readToken = .\scripts\New-DevelopmentToken.ps1 -Scope 'requests:read'
+```
+
+No Swagger, cole o valor de `$token` em Authorize, sem o prefixo Bearer. O auxiliar usa as mesmas variáveis de ambiente; se passar configuração diferente ao container, use os parâmetros `-Secret`, `-Issuer` e `-Audience` correspondentes. O script é uma ferramenta local e não implementa um fluxo OAuth nem deve ser usado para emitir tokens de produção.
+
+Em comunicação entre sistemas, o consumidor deve obter o token de um servidor OAuth 2.0 pelo fluxo `client_credentials`, com escopos concedidos por cliente. Em produção, substituir o segredo compartilhado de desenvolvimento por validação assimétrica usando as chaves públicas JWKS do servidor de autorização, preservando a verificação de emissor, audiência e tempos. A rotação de chaves fica sob responsabilidade do servidor de autorização; a migração para JWKS ainda não está implementada.
+
 ### API
 
 `POST /api/v1/requests` recebe:
@@ -108,11 +139,12 @@ O cliente usa HTTP/1.1 explicitamente, evitando negociação de upgrade HTTP/2 n
 .\mvnw.cmd verify
 ```
 
-Os testes de domínio e política de retry executam sem Spring. Os testes de integração usam MockMvc, a aplicação completa e PostgreSQL isolado via Testcontainers, com as migrations reais. Cobrem criação, validação, consulta, duplicidade, chamadas concorrentes, ausência de autenticação e geração OpenAPI a partir da interface. Para o provedor, um servidor HTTP local controlado pelo teste responde com sucesso, 400, 429, 500, 503 e atraso superior ao timeout. Os testes verificam status persistido, limite de tentativas, chave estável e ausência de transação durante a chamada HTTP. O worker agendado é desabilitado nos testes para que cada ciclo seja acionado de maneira determinística. O JWT simulado verifica as regras HTTP de autenticação, não a validação criptográfica de tokens.
+Os testes de domínio e política de retry executam sem Spring. Os testes de integração usam MockMvc, a aplicação completa e PostgreSQL isolado via Testcontainers, com as migrations reais. Cobrem criação, validação, consulta, duplicidade, chamadas concorrentes, ausência de autenticação e geração OpenAPI a partir da interface. Para o provedor, um servidor HTTP local controlado pelo teste responde com sucesso, 400, 429, 500, 503 e atraso superior ao timeout. Os testes verificam status persistido, limite de tentativas, chave estável e ausência de transação durante a chamada HTTP. O worker agendado é desabilitado nos testes para que cada ciclo seja acionado de maneira determinística. Os testes funcionais da API simulam um JWT autorizado; `SecurityIntegrationTests` envia tokens realmente assinados pelo filtro Bearer e pelo decoder, cobrindo escopos, assinatura incorreta, emissor/audiência incorretos ou ausentes, expiração, ausência de expiração, nbf futuro, token malformado e token sem assinatura.
 
 ## Pontos pendentes e próximos incrementos
 
-- Escopos de leitura/escrita, validação de emissor e audiência, e isolamento entre consumidores.
+- Isolamento entre consumidores (BOLA): atualmente, um token de leitura pode consultar solicitações de outros consumidores se souber o ID. A evolução deve persistir o identificador do consumidor e restringir as consultas por esse identificador.
+- Migração da chave HS256 de desenvolvimento para chaves públicas JWKS do servidor OAuth 2.0.
 - Reconciliação de solicitações presas em PROCESSING, Retry-After e jitter.
 - Credencial do provedor externo por secret manager, com rotação; o mock atual não exige autenticação.
 - CI e melhorias do container.
