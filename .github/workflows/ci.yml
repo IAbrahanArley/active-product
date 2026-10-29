@@ -1,0 +1,30 @@
+name: Build and tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Check Docker for Testcontainers
+        run: docker info
+      - name: Build and test
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Build application image
+        run: docker build -t product-activation-service:ci .
